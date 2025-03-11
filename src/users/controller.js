@@ -5,13 +5,13 @@ import { checkExistingUser, createUser, userById, deleteUserById } from "./servi
 // Register user -------------------------------------------
 export const registerUser = async(req, res) => {
   try {
-    const { firstName, lastName, email, password, mobile } = req.body;
+    const { firstName, lastName, email, password, mobile, role } = req.body;
     const isUserExist = await checkExistingUser(email);
     if (isUserExist) {
       return res.status(400).json({ message: "user already exist" });
     }
 
-    const bodyDTO = { firstName, lastName, email, password, mobile };
+    const bodyDTO = { firstName, lastName, email, password, mobile, role };
     await createUser(bodyDTO);
     res.status(201).json({ status:"success", message: "user registered successfully" });
   } catch (err) {
@@ -22,11 +22,16 @@ export const registerUser = async(req, res) => {
 // Login User ----------------------------------------------
 export const loginUser = async(req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     const userSearch = await checkExistingUser(email);
     if (!userSearch) {
       return res.status(400).json({ message: "email not registered" });
+    }
+    
+    const userRole = role || "User";
+    if(userSearch.role !== userRole){
+      return res.status(401).json({message: "access denied"})
     }
 
     const passwordMatch = await bcrypt.compare(password, userSearch.password);
@@ -34,7 +39,7 @@ export const loginUser = async(req, res) => {
       return res.status(400).json({ message: "password invalid" });
     }
 
-    const accessToken = await createToken(userSearch._id);
+    const accessToken = await createToken(userSearch._id, userSearch.role);
     return res.status(200).json({ access: accessToken });
   } catch (err) {
     res.status(500).json({ message: "server error, login failed", error: err });
@@ -84,7 +89,7 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// Delete user
+// Delete user ---------------------------------------------
 export const deleteUser = async (req, res) => {
   try {
     const userData = await userById(req.userId);
